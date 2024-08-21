@@ -546,7 +546,7 @@ void build_eq_constraint(int& c, string& left, int right)
     }
     // get ready for next clause
     auto count_cpy = coefs.size();
-    auto thres_cpy = tmp_sum_coef - clause_true_lit_thres[c];
+    auto thres_cpy = tmp_sum_coef - clause_true_lit_thres[c] - neg_count;
 
     if (!build_ge_constarint_impl(c, indices, coefs, right + neg_count)) {
         num_clauses--;
