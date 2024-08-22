@@ -3,7 +3,7 @@
 xcuserdata/
 *.xcuserstate
 *.xcworkspace
-.xcodeproj/
+nupboss.xcodeproj/
 DerivedData/
 build/
 .idea/
