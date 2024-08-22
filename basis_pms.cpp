@@ -318,6 +318,7 @@ void build_neighbor_relation()
 void parse_left(string& left, vector<int>& coefs, vector<int>& indices, int& neg_count)
 {
     neg_count = 0;
+    vector<var_with_weight> terms;
     smatch match;
     string::const_iterator search_start(left.cbegin());
 
@@ -325,8 +326,7 @@ void parse_left(string& left, vector<int>& coefs, vector<int>& indices, int& neg
         string coef_str = match[1];
         string index_str = match[2];
         coef_str.erase(remove_if(coef_str.begin(), coef_str.end(), ::isspace), coef_str.end());
-        coefs.push_back(stoi(coef_str));
-        indices.push_back(stoi(index_str.substr(1)));
+        
         double coef_tmp = stod(coef_str);
         if (coef_tmp - floor(coef_tmp) > 1e-6) {
             cout << "coef not int: " << coef_tmp << endl;
@@ -336,12 +336,16 @@ void parse_left(string& left, vector<int>& coefs, vector<int>& indices, int& neg
             exit(-1);
         }
         int coef = stoi(coef_str);
+	terms.emplace_back(stoi(index_str.substr(1)), coef);
         if (coef < 0) {
             neg_count -= coef;
         }
         search_start = match.suffix().first;
     }
-
+    for (auto& vw: terms) {
+    	coefs.push_back(vw.weight);
+        indices.push_back(vw.var_num);
+    }
 }
 
 bool build_ge_constarint(int& c, string& left, int right)
