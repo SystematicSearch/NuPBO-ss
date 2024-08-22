@@ -342,6 +342,8 @@ void parse_left(string& left, vector<int>& coefs, vector<int>& indices, int& neg
         }
         search_start = match.suffix().first;
     }
+    sort(terms.begin(), terms.end(), compare);
+    
     for (auto& vw: terms) {
     	coefs.push_back(vw.weight);
         indices.push_back(vw.var_num);
