@@ -355,7 +355,7 @@ bool build_ge_constarint(int& c, string& left, int right)
     vector<int> coefs;
 
     parse_left(left, coefs, indices, neg_count);
-    build_ge_constarint_impl(c, indices, coefs, neg_count + right);
+    return build_ge_constarint_impl(c, indices, coefs, neg_count + right);
 }
 
 bool build_ge_constarint_impl(int& c, vector<int>& indices, vector<int>& coefs, int degree)
