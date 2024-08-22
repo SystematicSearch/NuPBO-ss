@@ -369,22 +369,7 @@ bool build_ge_constarint_impl(int& c, vector<int>& indices, vector<int>& coefs, 
     // always satisfied clause will not generate
     if (clause_true_lit_thres[c] <= 0) { return false; }
 
-    if (use_presolve) {
-        // check fix status
-        for (int i = 0; i < clause_lit_count[c]; ++i) {
-            int v = indices[i];
-            int w = coefs[i];
-            if (IsFixed(v)) {
-                skip++;
-                if (fixed_sense[v] == static_cast<int>(w > 0)) {
-                    clause_true_lit_thres[c] -= abs(w);
-                }
-            }
-        }
-        if (clause_true_lit_thres[c] <= 0 || skip == clause_lit_count[c]) {
-            return false;
-        }
-    }
+    
     // create new clause
     clause_lit[c] = new lit[clause_lit_count[c] - skip + 1];
 
@@ -393,91 +378,33 @@ bool build_ge_constarint_impl(int& c, vector<int>& indices, vector<int>& coefs, 
     int j = 0;
     int sum_coeff = 0;
     int d = 1;
+    int fill_pointer = 0;
 
-    if (use_presolve) {
-        int64_t smallSum = 0;     // check planting
-        int64_t largeSum = 0;
-        if (abs(coefs[0]) > 1) {
-            // To cardinal
-            int tmp_skip_i = 0;
-            int tmp_skip_j = 0;
-            while (smallSum < clause_true_lit_thres[c] && i < clause_lit_count[c]) {
-                auto pos = clause_lit_count[c] - i - 1;
-                i++;
-                if (IsFixed(indices[pos])) {
-                    tmp_skip_i++;
-                    continue;
-                }
-                smallSum += abs(coefs[pos]);
-            }
-            while (largeSum < clause_true_lit_thres[c] && j < clause_lit_count[c]) {
-                auto pos = clause_lit_count[c] - i - 1;
-                j++;
-                if (IsFixed(indices[pos])) {
-                    tmp_skip_j++;
-                    continue;
-                }
-                largeSum += abs(coefs[pos]);
-            }
-            i -= tmp_skip_i;
-            j -= tmp_skip_j;
-            if (i == j) {
-                is_cardinal = true;
-            } else {
-                // saturate and divide
-                i = 0;
-                d = clause_true_lit_thres[c];
-                while ((abs(coefs[i]) >= clause_true_lit_thres[c] || IsFixed(indices[i]))
-                       && i < clause_lit_count[c]) { ++i; }
-                for (; i < clause_lit_count[c]; ++i) {
-                    if (IsFixed(indices[i])) { continue; }
-                    d = gcd(d, abs(coefs[i]));
-                    if (d <= 1) break;
-                }
-            }
+    for (i = 0; i < clause_lit_count[c]; ++i) {
+        if (IsFixed(indices[i])) { continue; }
+        int tmp_coef = min(abs(coefs[i]), clause_true_lit_thres[c]) / d;
+        if (tmp_coef == 0) {
+            skip++;
+            continue;
+        }
+        auto &term = clause_lit[c][fill_pointer++];
+
+        term.clause_num = c;
+        term.var_num = indices[i];
+        term.weight = tmp_coef;
+        term.sense = (coefs[i] > 0);
+        sum_coeff += term.weight;
+        if (term.weight < 0) {
+            cout << "?" << endl;
         }
     }
-    int fill_pointer = 0;
-    if (is_cardinal) {
-        for (i = 0; i < clause_lit_count[c]; ++i) {
-            if (IsFixed(indices[i])) { continue; }
-            auto& term = clause_lit[c][fill_pointer++];
-            term.clause_num = c;
-            term.var_num = indices[i];
-            term.weight = 1;
-            term.sense = (coefs[i] > 0);
-        }
-        clause_lit_count[c] = fill_pointer;
-        clause_true_lit_thres[c] = j;
-        sum_coeff = fill_pointer;
-    } else {
-
-        for (i = 0; i < clause_lit_count[c]; ++i) {
-            if (IsFixed(indices[i])) { continue; }
-            int tmp_coef = min(abs(coefs[i]), clause_true_lit_thres[c]) / d;
-            if (tmp_coef == 0) {
-                skip++;
-                continue;
-            }
-            auto &term = clause_lit[c][fill_pointer++];
-
-            term.clause_num = c;
-            term.var_num = indices[i];
-            term.weight = tmp_coef;
-            term.sense = (coefs[i] > 0);
-            sum_coeff += term.weight;
-            if (term.weight < 0) {
-                cout << "?" << endl;
-            }
-        }
-        if (d > 1) {
-            auto &degree = clause_true_lit_thres[c];
-            if (degree % d == 0) {
-                degree /= d;
-            } else {
-                degree /= d;
-                degree++;
-            }
+    if (d > 1) {
+        auto &degree = clause_true_lit_thres[c];
+        if (degree % d == 0) {
+            degree /= d;
+        } else {
+            degree /= d;
+            degree++;
         }
     }
 
@@ -517,35 +444,6 @@ void build_eq_constraint(int& c, string& left, int right)
     int odd_index_1 = -1;
     int oddity_of_thres = abs(clause_true_lit_thres[c] % 2);
 
-    if (use_presolve) {
-        for (i = 0; i < clause_lit_count[c]; ++i) {
-            int v = indices[i];
-            if (IsFixed(v) && (coefs[i] > 0) == fixed_sense[v]) {
-                oddity_of_thres += abs(coefs[i] % 2);
-                continue;
-            }
-            if (abs(coefs[i] % 2) == 1) {
-                // CAUTION: -1 % 2 == -1
-                odd_num++;
-                if (odd_num == 1) {
-                    odd_index_1 = i;
-                } else {
-                    break;
-                }
-            }
-        }
-
-        if (odd_num == 1) {
-            // fix the odd term
-            //    3x1 + ... = 2:  sense>0 thres%2=0  x1 = 0
-            //    3x1 + ... = 3:  sense>0 thres%2=1  x1 = 1
-            //    -3x1 + ... = 3: sense<0 thres%2=1  x1 = 0
-            //    -3x1 + ... = 2: sense<0 thres%2=0  x1 = 1
-            int fixed_var_num = indices[odd_index_1];
-            fixed_sense[fixed_var_num] = static_cast<int>((oddity_of_thres % 2) ==
-                                                          static_cast<int>(coefs[odd_index_1] > 0));
-        }
-    }
     int tmp_sum_coef = 0;
     for (i = 0; i < coefs.size(); ++i) {
         tmp_sum_coef += abs(coefs[i]);
@@ -835,11 +733,6 @@ void build_instance(const char *filename)
 	// creat var literal arrays
     build_var_lit(true);
 
-    if (use_presolve) {
-        Presolve pre;
-        pre.Run();
-        build_var_lit(false);
-    }
     if (avg_neighbor_lit < 1e+7)
     {
         build_neighbor_relation();
