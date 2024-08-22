@@ -233,6 +233,11 @@ struct var_with_weight
 {
     int var_num;
     int weight;
+    var_with_weight(){}
+    var_with_weight(int v, int w){
+        var_num = v;
+        weight = w;
+    }
 };
 extern var_with_weight* temp_unsat;
 
